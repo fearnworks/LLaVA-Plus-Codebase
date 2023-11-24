@@ -4,7 +4,7 @@ import os
 import re
 from typing import List, Tuple
 import torchvision.transforms.functional as F
-
+from PIL import Image
 
 def parse_tool_output(text):
     try:

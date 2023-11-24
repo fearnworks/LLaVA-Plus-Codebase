@@ -1,0 +1,82 @@
+# path/filename: docker-compose.yml
+
+version: "3"
+
+services:
+  controller:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile
+    volumes:
+      - .:/code:rx
+      - /mnt/e/model_storage/llava_models:/models:rwx
+    command: tini -- /bin/bash -c "/code/docker/run_controller.sh"
+    ports:
+      - "10000:10000"
+    networks:
+      - bakllava
+
+  webui:
+    build:
+      context: .
+      dockerfile: ./docker/Webui.Dockerfile
+    volumes:
+      - .:/code:rx
+      - /mnt/e/model_storage/llava_models:/models:rwx
+    command: tini -- /bin/bash -c "/code/docker/run_webui.sh"
+    ports:
+      - "11000:11000"
+    networks:
+      - bakllava
+
+  model_worker:
+    build:
+      context: .
+      dockerfile: ./docker/ModelWorker.Dockerfile
+    image: bakllava_model:latest
+    environment:
+      - HUGGINGFACE_API_TOKEN=${HUGGINGFACE_API_TOKEN}
+    command: tini -- /bin/bash -c "/code/docker/run_model_worker.sh"
+    volumes:
+      - .:/code:rx
+      - /mnt/e/model_storage/llava_models:/models:rwx
+    networks:
+      - bakllava
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    ports:
+      - "40000:40000"
+    depends_on:
+      - controller
+
+  grounded_sam_worker:
+    build:
+      context: .
+      dockerfile: ./docker/tool_workers/GroundedSAM.Dockerfile
+    environment:
+      - HUGGINGFACE_API_TOKEN=${HUGGINGFACE_API_TOKEN}
+    command:  /bin/bash -c "/code/docker/tool_workers/run_grounded_sam.sh"
+    volumes:
+      - .:/code:rx
+      - /mnt/e/model_storage:/models:rwx
+    networks:
+      - bakllava
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    ports:
+      - "41000:41000"
+
+
+networks:
+  bakllava:
+    external: true
